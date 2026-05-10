@@ -3,7 +3,7 @@
 WilmaxPOS 1.0 - Full Deployment Script
 - Creates Supabase storage buckets (products, employees, clients, documents, logos)
 - Runs SQL schema via Supabase Management API
-- Uploads dist/ to systemaspro.com via SSH/SFTP
+- Uploads dist/ to systemapro.com via SSH/SFTP
 """
 
 import os
@@ -26,7 +26,7 @@ SSH_HOST     = "82.25.87.157"
 SSH_PORT     = 65002
 SSH_USER     = "u108221933"
 SSH_PASS     = "Producers0587@"
-REMOTE_DIR   = "/home/u108221933/domains/systemaspro.com/public_html"
+REMOTE_DIR   = "/home/u108221933/domains/systemapro.com/public_html"
 
 DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
 SCHEMA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wilmaxpos_schema.sql")
@@ -136,7 +136,7 @@ def run_sql_schema():
     return False
 
 # ─────────────────────────────────────────────────────
-# STEP 3 — UPLOAD TO SYSTEMASPRO.COM
+# STEP 3 — UPLOAD TO SYSTEMAPRO.COM
 # ─────────────────────────────────────────────────────
 def sftp_upload_dir(sftp, local_dir, remote_dir):
     """Recursively upload a local directory via SFTP."""
@@ -156,7 +156,7 @@ def sftp_upload_dir(sftp, local_dir, remote_dir):
             print(f"     ↑ {item}")
 
 def upload_to_host():
-    section("HOSTINGER — Subiendo a systemaspro.com")
+    section("HOSTINGER — Subiendo a systemapro.com")
     if not os.path.isdir(DIST_DIR):
         print_err(f"dist/ no encontrado en {DIST_DIR} — ejecuta 'npm run build' primero")
         return False
@@ -201,7 +201,7 @@ RewriteRule ^ index.html [QSA,L]
 
         sftp.close()
         client.close()
-        print_ok(f"App publicada en https://systemaspro.com")
+        print_ok(f"App publicada en https://systemapro.com")
         return True
 
     except Exception as e:
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     print("\n" + "═"*55)
     print("  RESUMEN")
     print("═"*55)
-    print(f"  🌐 App:      https://systemaspro.com")
+    print(f"  🌐 App:      https://systemapro.com")
     print(f"  🗄️  DB:       {SUPABASE_URL}")
     print(f"  🗂️  Storage:  {SUPABASE_URL}/storage/v1")
     print(f"  📋 Schema:   wilmaxpos_schema.sql")
