@@ -220,7 +220,7 @@ interface StockAdjustmentModalProps {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
-  onAdjust: (productId: number, newStock: number, reason: string, adminPin?: string) => boolean;
+  onAdjust: (productId: number, newStock: number, reason: string, adminPin?: string) => boolean | Promise<boolean>;
 }
 
 function StockAdjustmentModal({ product, isOpen, onClose, onAdjust }: StockAdjustmentModalProps) {

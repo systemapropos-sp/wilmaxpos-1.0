@@ -1,5 +1,6 @@
 import { Toaster } from 'sonner';
 import { useAppStore } from '@/store';
+import { useEffect } from 'react';
 import { Login } from '@/components/Login';
 import { Sidebar } from '@/components/Sidebar';
 import { QuickActionsButton } from '@/components/QuickActionsButton';
@@ -21,18 +22,26 @@ import { Stores } from '@/components/Stores';
 import { Settings } from '@/components/Settings';
 import { Help } from '@/components/Help';
 import { Products } from '@/components/Products';
-import { useEffect } from 'react';
-
 function App() {
-  const { isAuthenticated, sidebarCollapsed, currentPage } = useAppStore();
+  const { isAuthenticated, sidebarCollapsed, currentPage, initialized, loading, initializeApp } = useAppStore();
   const { notifications, markAsRead, markAllAsRead, clearNotification } = useNotifications();
 
-  // Mostrar notificación de bienvenida al iniciar sesión
   useEffect(() => {
-    if (isAuthenticated) {
-      // Las notificaciones iniciales ya están en el hook useNotifications
-    }
-  }, [isAuthenticated]);
+    initializeApp();
+  }, [initializeApp]);
+
+  if (loading || !initialized) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--background)]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-700">Cargando WILMAX POS…</h2>
+          <p className="text-sm text-gray-400 mt-1">Sincronizando datos con Supabase</p>
+        </div>
+        <Toaster position="top-right" richColors />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
