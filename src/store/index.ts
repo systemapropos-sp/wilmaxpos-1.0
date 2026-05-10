@@ -568,8 +568,21 @@ export const useAppStore = create<StoreState>()(
       
       // CRUD Operations
       addClient: (client) => {
+        const currentUser = get().currentUser;
         set((state) => ({
-          clients: [...state.clients, { ...client, id: Date.now(), createdAt: new Date().toISOString() }]
+          clients: [...state.clients, { ...client, id: Date.now(), createdAt: new Date().toISOString() }],
+          activityLogs: [
+            {
+              id: Date.now(),
+              date: new Date().toLocaleString('es-DO'),
+              user: currentUser?.name || 'Sistema',
+              controller: 'Clientes',
+              action: 'Agregar',
+              details: `Nuevo cliente registrado: ${client.name}`,
+              platform: navigator.platform || 'Web',
+            },
+            ...state.activityLogs,
+          ],
         }));
       },
       
@@ -612,8 +625,22 @@ export const useAppStore = create<StoreState>()(
       },
       
       addSale: (sale) => {
-        set((state) => ({
-          sales: [...state.sales, { ...sale, id: Date.now() }]
+        const newSale = { ...sale, id: Date.now() };
+        const state = get();
+        set((prevState) => ({
+          sales: [...prevState.sales, newSale],
+          activityLogs: [
+            {
+              id: Date.now(),
+              date: new Date().toLocaleString('es-DO'),
+              user: state.currentUser?.name || 'Sistema',
+              controller: 'Ventas',
+              action: 'Agregar',
+              details: `Venta ${newSale.saleId} por RD$${newSale.total.toLocaleString()} - ${newSale.clientName || 'Cliente General'}`,
+              platform: navigator.platform || 'Web',
+            },
+            ...prevState.activityLogs,
+          ],
         }));
       },
       
@@ -783,15 +810,24 @@ export const useAppStore = create<StoreState>()(
       // Stats
       getDashboardStats: () => {
         const state = get();
+        const now = new Date();
+        const todayStr = now.toISOString().slice(0, 10);
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const todaySalesArr = state.sales.filter(s => s.date.slice(0, 10) === todayStr && s.status !== 'cancelled');
+        const weekSalesArr = state.sales.filter(s => new Date(s.date) >= weekAgo && s.status !== 'cancelled');
+        const monthSalesArr = state.sales.filter(s => new Date(s.date) >= monthStart && s.status !== 'cancelled');
+
         return {
-          totalSales: state.sales.length,
+          totalSales: state.sales.filter(s => s.status !== 'cancelled').length,
           totalInventory: state.products.length,
           totalClients: state.clients.length,
           totalKits: state.kits.length,
-          todaySales: 0,
-          todayRevenue: 0,
-          weekSales: 0,
-          monthSales: 0,
+          todaySales: todaySalesArr.length,
+          todayRevenue: todaySalesArr.reduce((sum, s) => sum + s.total, 0),
+          weekSales: weekSalesArr.length,
+          monthSales: monthSalesArr.reduce((sum, s) => sum + s.total, 0),
         };
       },
       
