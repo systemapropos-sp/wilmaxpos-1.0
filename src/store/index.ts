@@ -21,6 +21,7 @@ import {
   dbAddLog, dbAddMovement,
   dbAddDocument, dbDeleteDocument,
 } from '@/lib/db';
+import { supabase } from '@/lib/supabase';
 
 /* ─────────────────────────────────────────────────────────
    DEMO USERS  (login is PIN-based, users come from Supabase)
@@ -38,7 +39,10 @@ interface StoreState {
   // Init
   initialized: boolean;
   loading: boolean;
+  businessId: string;
+  businessName: string;
   initializeApp: () => Promise<void>;
+  loginBusiness: (code: string) => Promise<{ id: string; name: string } | null>;
 
   // Auth
   isAuthenticated: boolean;
@@ -146,11 +150,11 @@ export const useAppStore = create<StoreState>()(
       loading: false,
 
       initializeApp: async () => {
-        if (get().initialized) return;
+        const businessId = get().businessId;
+        if (!businessId || get().initialized) return;
         set({ loading: true });
         try {
-          const data = await fetchAllData();
-          // If Supabase users exist, use them; otherwise fall back to demo users
+          const data = await fetchAllData(businessId);
           const users = data.users.length > 0 ? data.users : demoUsers;
           set({ ...data, users, initialized: true });
         } catch (err) {
@@ -162,9 +166,23 @@ export const useAppStore = create<StoreState>()(
         }
       },
 
+      loginBusiness: async (code: string) => {
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('id, name')
+          .ilike('business_code', code.trim())
+          .eq('is_active', true)
+          .single();
+        if (error || !data) return null;
+        set({ businessId: data.id, businessName: data.name, initialized: false });
+        return { id: data.id, name: data.name };
+      },
+
       // ── Auth ──────────────────
       isAuthenticated: false,
       currentUser: null,
+      businessId: '',
+      businessName: '',
 
       login: (pin) => {
         const users = get().users.length > 0 ? get().users : demoUsers;
@@ -262,9 +280,10 @@ export const useAppStore = create<StoreState>()(
 
       // ── Clients ──────────────
       addClient: async (client) => {
-        const saved = await dbAddClient(client);
+        const bid = get().businessId;
+        const saved = await dbAddClient(client, bid);
         const state = get();
-        await dbAddLog({ date: '', user: state.currentUser?.name || 'Sistema', controller: 'Clientes', action: 'Agregar', details: `Nuevo cliente: ${client.name}`, platform: navigator.platform });
+        await dbAddLog({ date: '', user: state.currentUser?.name || 'Sistema', controller: 'Clientes', action: 'Agregar', details: `Nuevo cliente: ${client.name}`, platform: navigator.platform }, bid);
         set((s) => ({
           clients: [...s.clients, saved],
           activityLogs: [{ id: Date.now(), date: new Date().toLocaleString('es-DO'), user: state.currentUser?.name || 'Sistema', controller: 'Clientes', action: 'Agregar', details: `Nuevo cliente: ${client.name}`, platform: navigator.platform }, ...s.activityLogs],
@@ -281,7 +300,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Products ──────────────
       addProduct: async (product) => {
-        const saved = await dbAddProduct(product);
+        const saved = await dbAddProduct(product, get().businessId);
         set((s) => ({ products: [...s.products, saved] }));
       },
       updateProduct: async (id, product) => {
@@ -302,9 +321,10 @@ export const useAppStore = create<StoreState>()(
 
       // ── Sales ──────────────────
       addSale: async (sale) => {
-        const saved = await dbAddSale(sale);
+        const bid = get().businessId;
+        const saved = await dbAddSale(sale, bid);
         const state = get();
-        await dbAddLog({ date: '', user: state.currentUser?.name || 'Sistema', controller: 'Ventas', action: 'Agregar', details: `Venta ${sale.saleId} por RD$${sale.total.toLocaleString()} — ${sale.clientName || 'General'}`, platform: navigator.platform });
+        await dbAddLog({ date: '', user: state.currentUser?.name || 'Sistema', controller: 'Ventas', action: 'Agregar', details: `Venta ${sale.saleId} por RD$${sale.total.toLocaleString()} — ${sale.clientName || 'General'}`, platform: navigator.platform }, bid);
         set((s) => ({
           sales: [saved, ...s.sales],
           activityLogs: [{ id: Date.now(), date: new Date().toLocaleString('es-DO'), user: state.currentUser?.name || 'Sistema', controller: 'Ventas', action: 'Agregar', details: `Venta ${sale.saleId} por RD$${sale.total.toLocaleString()} — ${sale.clientName || 'General'}`, platform: navigator.platform }, ...s.activityLogs],
@@ -313,7 +333,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Purchases ──────────────
       addPurchase: async (purchase) => {
-        const saved = await dbAddPurchase(purchase);
+        const saved = await dbAddPurchase(purchase, get().businessId);
         set((s) => ({ purchases: [saved, ...s.purchases] }));
       },
       updatePurchase: async (id, purchase) => {
@@ -327,7 +347,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Expenses ──────────────
       addExpense: async (expense) => {
-        const saved = await dbAddExpense(expense);
+        const saved = await dbAddExpense(expense, get().businessId);
         set((s) => ({ expenses: [saved, ...s.expenses] }));
       },
       updateExpense: async (id, expense) => {
@@ -341,7 +361,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Suppliers ──────────────
       addSupplier: async (supplier) => {
-        const saved = await dbAddSupplier(supplier);
+        const saved = await dbAddSupplier(supplier, get().businessId);
         set((s) => ({ suppliers: [...s.suppliers, saved] }));
       },
       updateSupplier: async (id, supplier) => {
@@ -355,7 +375,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Employees ──────────────
       addEmployee: async (employee) => {
-        const saved = await dbAddEmployee(employee);
+        const saved = await dbAddEmployee(employee, get().businessId);
         set((s) => ({ employees: [...s.employees, saved] }));
       },
       updateEmployee: async (id, employee) => {
@@ -369,7 +389,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Kits ──────────────────
       addKit: async (kit) => {
-        const saved = await dbAddKit(kit);
+        const saved = await dbAddKit(kit, get().businessId);
         set((s) => ({ kits: [...s.kits, saved] }));
       },
       updateKit: async (id, kit) => {
@@ -383,7 +403,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Vouchers ──────────────
       addVoucher: async (voucher) => {
-        const saved = await dbAddVoucher(voucher);
+        const saved = await dbAddVoucher(voucher, get().businessId);
         set((s) => ({ vouchers: [...s.vouchers, saved] }));
       },
       updateVoucher: async (id, voucher) => {
@@ -397,7 +417,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Gift Cards ──────────────
       addGiftCard: async (gc) => {
-        const saved = await dbAddGiftCard(gc);
+        const saved = await dbAddGiftCard(gc, get().businessId);
         set((s) => ({ giftCards: [...s.giftCards, saved] }));
       },
       updateGiftCard: async (id, gc) => {
@@ -407,7 +427,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Inventory ──────────────
       addInventoryMovement: (movement) => {
-        void dbAddMovement(movement);
+        void dbAddMovement(movement, get().businessId);
         set((s) => ({ inventoryMovements: [{ ...movement, id: Date.now() }, ...s.inventoryMovements] }));
       },
       getProductMovements: (productId) => get().inventoryMovements.filter(m => m.productId === productId),
@@ -431,7 +451,7 @@ export const useAppStore = create<StoreState>()(
 
       // ── Documents ──────────────
       addDocument: async (doc) => {
-        const saved = await dbAddDocument(doc);
+        const saved = await dbAddDocument(doc, get().businessId);
         set((s) => ({ documents: [saved, ...s.documents] }));
       },
       deleteDocument: async (id) => {
@@ -471,6 +491,8 @@ export const useAppStore = create<StoreState>()(
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         currentUser: state.currentUser,
+        businessId: state.businessId,
+        businessName: state.businessName,
         sidebarCollapsed: state.sidebarCollapsed,
         // Don't persist data — always reload from Supabase
       }),

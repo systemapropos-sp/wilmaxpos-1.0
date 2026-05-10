@@ -60,33 +60,35 @@ function throwOnError(error: { message: string } | null, ctx: string) {
 
 // ─────────────────────────────────────────────────────────
 // FETCH ALL  (called on app init to populate Zustand store)
+// Filtered by business_id for multi-tenant isolation
 // ─────────────────────────────────────────────────────────
-export async function fetchAllData() {
+export async function fetchAllData(businessId: string) {
+  const bid = businessId;
   const [
     uR, cR, pR, kR, kpR, sR, eR, lR, pyR,
     saR, siR, prR, piR, exR, gcR, vR, stR, rgR, lgR, mvR, dcR,
   ] = await Promise.all([
-    supabase.from('users').select('*').order('id'),
-    supabase.from('clients').select('*').order('name'),
-    supabase.from('products').select('*').order('name'),
-    supabase.from('kits').select('*').order('kit_id'),
-    supabase.from('kit_products').select('*'),
-    supabase.from('suppliers').select('*').order('company'),
-    supabase.from('employees').select('*').order('name'),
-    supabase.from('employee_loans').select('*').order('date'),
-    supabase.from('employee_payments').select('*').order('date'),
-    supabase.from('sales').select('*').order('date', { ascending: false }),
-    supabase.from('sale_items').select('*'),
-    supabase.from('purchases').select('*').order('date', { ascending: false }),
-    supabase.from('purchase_items').select('*'),
-    supabase.from('expenses').select('*').order('date', { ascending: false }),
-    supabase.from('gift_cards').select('*').order('card_number'),
-    supabase.from('vouchers').select('*').order('type'),
-    supabase.from('stores').select('*').order('id'),
-    supabase.from('cash_registers').select('*').order('id'),
-    supabase.from('activity_logs').select('*').order('date', { ascending: false }).limit(200),
-    supabase.from('inventory_movements').select('*').order('date', { ascending: false }),
-    supabase.from('documents').select('*').order('uploaded_at', { ascending: false }),
+    supabase.from('users').select('*').eq('business_id', bid).order('id'),
+    supabase.from('clients').select('*').eq('business_id', bid).order('name'),
+    supabase.from('products').select('*').eq('business_id', bid).order('name'),
+    supabase.from('kits').select('*').eq('business_id', bid).order('kit_id'),
+    supabase.from('kit_products').select('*').eq('business_id', bid),
+    supabase.from('suppliers').select('*').eq('business_id', bid).order('company'),
+    supabase.from('employees').select('*').eq('business_id', bid).order('name'),
+    supabase.from('employee_loans').select('*').eq('business_id', bid).order('date'),
+    supabase.from('employee_payments').select('*').eq('business_id', bid).order('date'),
+    supabase.from('sales').select('*').eq('business_id', bid).order('date', { ascending: false }),
+    supabase.from('sale_items').select('*').eq('business_id', bid),
+    supabase.from('purchases').select('*').eq('business_id', bid).order('date', { ascending: false }),
+    supabase.from('purchase_items').select('*').eq('business_id', bid),
+    supabase.from('expenses').select('*').eq('business_id', bid).order('date', { ascending: false }),
+    supabase.from('gift_cards').select('*').eq('business_id', bid).order('card_number'),
+    supabase.from('vouchers').select('*').eq('business_id', bid).order('type'),
+    supabase.from('stores').select('*').eq('business_id', bid).order('id'),
+    supabase.from('cash_registers').select('*').eq('business_id', bid).order('id'),
+    supabase.from('activity_logs').select('*').eq('business_id', bid).order('date', { ascending: false }).limit(200),
+    supabase.from('inventory_movements').select('*').eq('business_id', bid).order('date', { ascending: false }),
+    supabase.from('documents').select('*').eq('business_id', bid).order('uploaded_at', { ascending: false }),
   ]);
 
   const kitProds = kpR.data || [];
@@ -118,12 +120,12 @@ export async function fetchAllData() {
 // ─────────────────────────────────────────────────────────
 // CLIENTS
 // ─────────────────────────────────────────────────────────
-export async function dbAddClient(c: Omit<Client, 'id' | 'createdAt'>): Promise<Client> {
+export async function dbAddClient(c: Omit<Client, 'id' | 'createdAt'>, bid: string): Promise<Client> {
   const { data, error } = await supabase.from('clients').insert({
     name: c.name, last_name: c.lastName, company: c.company, email: c.email, phone: c.phone,
     address1: c.address1, address2: c.address2, city: c.city, province: c.province,
     tax_id: c.taxId, photo_url: c.avatar, credit_balance: c.creditBalance || 0,
-    credit_limit: c.creditLimit || 0, is_active: c.isActive ?? true,
+    credit_limit: c.creditLimit || 0, is_active: c.isActive ?? true, business_id: bid,
   }).select().single();
   throwOnError(error, 'addClient');
   return m.client(data);
@@ -152,7 +154,7 @@ export async function dbDeleteClient(id: number) {
 // ─────────────────────────────────────────────────────────
 // PRODUCTS
 // ─────────────────────────────────────────────────────────
-export async function dbAddProduct(prod: Omit<Product, 'id'>): Promise<Product> {
+export async function dbAddProduct(prod: Omit<Product, 'id'>, bid: string): Promise<Product> {
   const { data, error } = await supabase.from('products').insert({
     barcode: prod.barcode, name: prod.name, description: prod.description,
     category: prod.category, size: prod.size, supplier_name: prod.supplier,
@@ -163,7 +165,7 @@ export async function dbAddProduct(prod: Omit<Product, 'id'>): Promise<Product> 
     is_service: prod.isService, prices_include_tax: prod.pricesIncludeTax,
     allow_alternate_description: prod.allowAlternateDescription,
     has_serial_number: prod.hasSerialNumber, is_favorite: prod.isFavorite || false,
-    is_active: prod.isActive ?? true, image_url: prod.image,
+    is_active: prod.isActive ?? true, image_url: prod.image, business_id: bid,
   }).select().single();
   throwOnError(error, 'addProduct');
   return m.product(data);
@@ -198,19 +200,19 @@ export async function dbDeleteProduct(id: number) {
 // ─────────────────────────────────────────────────────────
 // SALES
 // ─────────────────────────────────────────────────────────
-export async function dbAddSale(s: Omit<Sale, 'id'>): Promise<Sale> {
+export async function dbAddSale(s: Omit<Sale, 'id'>, bid: string): Promise<Sale> {
   const { data, error } = await supabase.from('sales').insert({
     sale_id: s.saleId, date: s.date, client_id: s.clientId, client_name: s.clientName,
     employee: s.employee, register_name: s.register,
     subtotal: s.subtotal, discount: s.discount, tax: s.tax, total: s.total,
     amount_paid: s.paymentAmount, change_amount: s.change,
-    payment_method: s.paymentMethod, status: s.status, notes: s.notes,
+    payment_method: s.paymentMethod, status: s.status, notes: s.notes, business_id: bid,
   }).select().single();
   throwOnError(error, 'addSale');
   if (s.items.length > 0) {
     const rows = s.items.map(i => ({
       sale_id: data.id, product_id: i.productId, product_name: i.productName,
-      quantity: i.quantity, unit_price: i.unitPrice, discount: i.discount || 0, total: i.total,
+      quantity: i.quantity, unit_price: i.unitPrice, discount: i.discount || 0, total: i.total, business_id: bid,
     }));
     const { error: ie } = await supabase.from('sale_items').insert(rows);
     throwOnError(ie, 'addSaleItems');
@@ -221,16 +223,16 @@ export async function dbAddSale(s: Omit<Sale, 'id'>): Promise<Sale> {
 // ─────────────────────────────────────────────────────────
 // PURCHASES
 // ─────────────────────────────────────────────────────────
-export async function dbAddPurchase(pur: Omit<Purchase, 'id'>): Promise<Purchase> {
+export async function dbAddPurchase(pur: Omit<Purchase, 'id'>, bid: string): Promise<Purchase> {
   const { data, error } = await supabase.from('purchases').insert({
     purchase_id: pur.purchaseId, date: pur.date, expected_date: pur.expectedDate,
     supplier_id: pur.supplierId, supplier_name: pur.supplierName,
     subtotal: pur.subtotal, tax: pur.tax, discount: pur.discount, total: pur.total,
-    status: pur.status, notes: pur.notes,
+    status: pur.status, notes: pur.notes, business_id: bid,
   }).select().single();
   throwOnError(error, 'addPurchase');
   if (pur.items.length > 0) {
-    const rows = pur.items.map(i => ({ purchase_id: data.id, product_id: i.productId, product_name: i.productName, quantity: i.quantity, unit_cost: i.unitCost, discount: i.discount || 0, total: i.total }));
+    const rows = pur.items.map(i => ({ purchase_id: data.id, product_id: i.productId, product_name: i.productName, quantity: i.quantity, unit_cost: i.unitCost, discount: i.discount || 0, total: i.total, business_id: bid }));
     const { error: ie } = await supabase.from('purchase_items').insert(rows);
     throwOnError(ie, 'addPurchaseItems');
   }
@@ -251,10 +253,10 @@ export async function dbDeletePurchase(id: number) {
 // ─────────────────────────────────────────────────────────
 // EXPENSES
 // ─────────────────────────────────────────────────────────
-export async function dbAddExpense(e: Omit<Expense, 'id'>): Promise<Expense> {
+export async function dbAddExpense(e: Omit<Expense, 'id'>, bid: string): Promise<Expense> {
   const { data, error } = await supabase.from('expenses').insert({
     date: e.date, category: e.category, description: e.description,
-    amount: e.amount, tax: e.tax || 0, recipient: e.recipient, approved_by: e.approvedBy, notes: e.notes,
+    amount: e.amount, tax: e.tax || 0, recipient: e.recipient, approved_by: e.approvedBy, notes: e.notes, business_id: bid,
   }).select().single();
   throwOnError(error, 'addExpense');
   return m.expense(data);
@@ -277,11 +279,11 @@ export async function dbDeleteExpense(id: number) {
 // ─────────────────────────────────────────────────────────
 // SUPPLIERS
 // ─────────────────────────────────────────────────────────
-export async function dbAddSupplier(s: Omit<Supplier, 'id'>): Promise<Supplier> {
+export async function dbAddSupplier(s: Omit<Supplier, 'id'>, bid: string): Promise<Supplier> {
   const { data, error } = await supabase.from('suppliers').insert({
     company: s.company, first_name: s.firstName, last_name: s.lastName,
     email: s.email, phone: s.phone, address: s.address, city: s.city,
-    tax_id: s.taxId, balance: s.balance || 0, notes: s.notes, is_active: s.isActive ?? true,
+    tax_id: s.taxId, balance: s.balance || 0, notes: s.notes, is_active: s.isActive ?? true, business_id: bid,
   }).select().single();
   throwOnError(error, 'addSupplier');
   return m.supplier(data);
@@ -306,12 +308,12 @@ export async function dbDeleteSupplier(id: number) {
 // ─────────────────────────────────────────────────────────
 // EMPLOYEES
 // ─────────────────────────────────────────────────────────
-export async function dbAddEmployee(e: Omit<Employee, 'id'>): Promise<Employee> {
+export async function dbAddEmployee(e: Omit<Employee, 'id'>, bid: string): Promise<Employee> {
   const { data, error } = await supabase.from('employees').insert({
     name: e.name, email: e.email, phone: e.phone, avatar: e.avatar,
     position: e.position, department: e.department,
     salary_biweekly: e.salaryBiweekly, salary_monthly: e.salaryMonthly,
-    hire_date: e.hireDate, total_loans: 0, total_payments: 0, is_active: e.isActive ?? true,
+    hire_date: e.hireDate, total_loans: 0, total_payments: 0, is_active: e.isActive ?? true, business_id: bid,
   }).select().single();
   throwOnError(error, 'addEmployee');
   return m.employee(data);
@@ -340,11 +342,11 @@ export async function dbDeleteEmployee(id: number) {
 // ─────────────────────────────────────────────────────────
 // KITS
 // ─────────────────────────────────────────────────────────
-export async function dbAddKit(k: Omit<Kit, 'id'>): Promise<Kit> {
+export async function dbAddKit(k: Omit<Kit, 'id'>, bid: string): Promise<Kit> {
   const { data, error } = await supabase.from('kits').insert({
     kit_id: k.kitId, name: k.name, description: k.description,
     cost: k.cost || 0, sale_price: k.salePrice || 0, category: k.category,
-    image_url: k.image, is_active: k.isActive ?? true,
+    image_url: k.image, is_active: k.isActive ?? true, business_id: bid,
   }).select().single();
   throwOnError(error, 'addKit');
   return m.kit(data);
@@ -367,10 +369,10 @@ export async function dbDeleteKit(id: number) {
 // ─────────────────────────────────────────────────────────
 // VOUCHERS
 // ─────────────────────────────────────────────────────────
-export async function dbAddVoucher(v: Omit<Voucher, 'id'>): Promise<Voucher> {
+export async function dbAddVoucher(v: Omit<Voucher, 'id'>, bid: string): Promise<Voucher> {
   const { data, error } = await supabase.from('vouchers').insert({
     description: v.description, series: v.series, type: v.type,
-    from: v.from, to: v.to, current: v.current, is_active: v.isActive ?? true,
+    from: v.from, to: v.to, current: v.current, is_active: v.isActive ?? true, business_id: bid,
   }).select().single();
   throwOnError(error, 'addVoucher');
   return m.voucher(data);
@@ -391,10 +393,10 @@ export async function dbDeleteVoucher(id: number) {
 // ─────────────────────────────────────────────────────────
 // GIFT CARDS
 // ─────────────────────────────────────────────────────────
-export async function dbAddGiftCard(g: Omit<GiftCard, 'id'>): Promise<GiftCard> {
+export async function dbAddGiftCard(g: Omit<GiftCard, 'id'>, bid: string): Promise<GiftCard> {
   const { data, error } = await supabase.from('gift_cards').insert({
     card_number: g.cardNumber, value: g.value, balance: g.balance,
-    description: g.description, is_active: g.isActive ?? true, issue_date: g.issueDate,
+    description: g.description, is_active: g.isActive ?? true, issue_date: g.issueDate, business_id: bid,
   }).select().single();
   throwOnError(error, 'addGiftCard');
   return m.giftCard(data);
@@ -410,33 +412,36 @@ export async function dbUpdateGiftCard(id: number, g: Partial<GiftCard>) {
 // ─────────────────────────────────────────────────────────
 // ACTIVITY LOG
 // ─────────────────────────────────────────────────────────
-export async function dbAddLog(log: Omit<ActivityLog, 'id'>) {
+export async function dbAddLog(log: Omit<ActivityLog, 'id'>, bid?: string) {
   await supabase.from('activity_logs').insert({
     date: new Date().toISOString(), user_name: log.user, controller: log.controller,
     action: log.action, details: log.details, platform: log.platform || navigator.platform,
+    ...(bid ? { business_id: bid } : {}),
   });
 }
 
 // ─────────────────────────────────────────────────────────
 // INVENTORY MOVEMENTS
 // ─────────────────────────────────────────────────────────
-export async function dbAddMovement(mv: Omit<InventoryMovement, 'id'>) {
+export async function dbAddMovement(mv: Omit<InventoryMovement, 'id'>, bid?: string) {
   await supabase.from('inventory_movements').insert({
     product_id: mv.productId, product_name: mv.productName, type: mv.type,
     quantity: mv.quantity, previous_stock: mv.previousStock, new_stock: mv.newStock,
     reason: mv.reason, requires_auth: mv.requiresAuth, authorized_by: mv.authorizedBy,
     user_name: mv.user, date: mv.date || new Date().toISOString(),
+    ...(bid ? { business_id: bid } : {}),
   });
 }
 
 // ─────────────────────────────────────────────────────────
 // DOCUMENTS
 // ─────────────────────────────────────────────────────────
-export async function dbAddDocument(d: Omit<Document, 'id'>): Promise<Document> {
+export async function dbAddDocument(d: Omit<Document, 'id'>, bid?: string): Promise<Document> {
   const { data, error } = await supabase.from('documents').insert({
     name: d.name, type: d.type, file_url: d.fileUrl, file_type: d.fileType,
     file_size: d.fileSize, entity_type: d.entityType, entity_id: d.entityId,
     uploaded_by: d.uploadedBy, uploaded_at: d.uploadedAt,
+    ...(bid ? { business_id: bid } : {}),
   }).select().single();
   throwOnError(error, 'addDocument');
   return m.document(data);
